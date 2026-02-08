@@ -284,6 +284,34 @@ class SQLiteSyncUploader:
         return stats
 
 
+def load_config_file(config_path: str) -> Dict:
+    """
+    Load configuration from JSON file
+    
+    Args:
+        config_path: Path to JSON configuration file
+    
+    Returns:
+        Dictionary with configuration values
+    """
+    try:
+        config_file = Path(config_path).resolve()
+        if not config_file.exists():
+            print(f"Error: Configuration file not found: {config_file}", file=sys.stderr)
+            sys.exit(1)
+        
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+        
+        return config
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in configuration file: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Could not read configuration file: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
@@ -291,35 +319,58 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --authorization ABC --device-id DEVICE123 --source /data/logs --temp /tmp/upload --url https://example.com/api
-  %(prog)s -a ABC-d DEVICE123 -s ./logs -t ./temp -u http://localhost/upload -v
+  %(prog)s --config config.json --source /data/logs --temp /tmp/upload
+  %(prog)s -c config.json -s ./logs -t ./temp -v
         """
     )
     
-    parser.add_argument('-a', '--authorization', required=True,
-                        help='Authorization')
-    parser.add_argument('-d', '--device-id', required=True,
-                        help='Device identifier')
+    parser.add_argument('-c', '--config', required=True,
+                        help='Path to JSON configuration file (contains device_id, base_url, authorization)')
     parser.add_argument('-s', '--source', required=True,
                         help='Source folder containing *.sqlite files')
     parser.add_argument('-t', '--temp', required=True,
                         help='Temporary folder for ZIP files')
-    parser.add_argument('-u', '--url', required=True,
-                        help='Base URL of upload server')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Enable verbose logging')
     parser.add_argument('--keep-temp', action='store_true',
                         help='Keep temporary ZIP files after upload')
     
+    # Optional command-line overrides (for backward compatibility)
+    parser.add_argument('-a', '--authorization',
+                        help='Authorization (overrides config file value)')
+    parser.add_argument('-d', '--device-id',
+                        help='Device identifier (overrides config file value)')
+    parser.add_argument('-u', '--url',
+                        help='Base URL of upload server (overrides config file value)')
+    
     args = parser.parse_args()
+    
+    # Load configuration from file
+    config = load_config_file(args.config)
+    
+    # Extract values from config, use command-line overrides if provided
+    authorization = args.authorization or config.get('authorization')
+    device_id = args.device_id or config.get('device_id')
+    base_url = args.url or config.get('base_url')
+    
+    # Validate required configuration values
+    if not authorization:
+        print("Error: 'authorization' not provided in config file or command line", file=sys.stderr)
+        sys.exit(1)
+    if not device_id:
+        print("Error: 'device_id' not provided in config file or command line", file=sys.stderr)
+        sys.exit(1)
+    if not base_url:
+        print("Error: 'base_url' not provided in config file or command line", file=sys.stderr)
+        sys.exit(1)
     
     # Create uploader instance
     uploader = SQLiteSyncUploader(
-        authorization=args.authorization,
-        device_id=args.device_id,
+        authorization=authorization,
+        device_id=device_id,
         source_folder=args.source,
         temp_folder=args.temp,
-        base_url=args.url,
+        base_url=base_url,
         verbose=args.verbose
     )
     

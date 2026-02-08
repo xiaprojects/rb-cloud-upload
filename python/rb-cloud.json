@@ -1,0 +1,5 @@
+{
+  "device_id": "YOUR_DEVICE_ID",
+  "base_url": "https://example.com/api",
+  "authorization": "YOUR_AUTHORIZATION_TOKEN"
+}
