@@ -1,0 +1,14 @@
+[Unit]
+Description=RB Cloud Sync
+After=network.target
+
+[Service]
+ExecStart=/opt/stratux/bin/rb_cloud_sync.sh
+User=pi
+KillMode=process
+Restart=always
+RestartSec=60
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target
