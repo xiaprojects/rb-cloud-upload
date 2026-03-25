@@ -101,7 +101,7 @@ class SQLiteSyncUploader:
         Returns:
             List of Path objects for SQLite files
         """
-        patterns = ['*.sqlite', '*.sqlite3', '*.db']
+        patterns = ['*.sqlite', '*.sqlite3']
         sqlite_files = []
         
         for pattern in patterns:
@@ -149,7 +149,7 @@ class SQLiteSyncUploader:
         Returns:
             Path to created ZIP file, or None on error
         """
-        zip_filename = f"{sqlite_file.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        zip_filename = f"{sqlite_file.stem}.zip" # We want to have 1 file on the server and locally_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
         zip_path = self.temp_folder / zip_filename
         
         try:
@@ -219,6 +219,29 @@ class SQLiteSyncUploader:
                 self.log(f"  Cleaned up temp file: {zip_file.name}")
         except Exception as e:
             self.log(f"  Warning: Could not delete temp file: {e}")
+    
+    def post_stats_to_endpoint(self, stats: Dict[str, int] ) -> bool:
+        """
+        Post upload statistics to remote endpoint
+        
+        Args:
+            stats: Dictionary containing upload statistics
+        
+        Returns:
+            True if POST successful, False otherwise
+        """
+        url = "http://localhost/setEMS"
+        payload = {"clouduploaded": stats['uploaded']}
+        
+        try:
+            self.log(f"Posting stats to: {url}")
+            response = requests.post(url, json=payload, timeout=30)
+            response.raise_for_status()
+            self.log(f"✓ Stats posted successfully: {response.text}")
+            return True
+        except requests.RequestException as e:
+            self.log(f"✗ Error posting stats: {e}", force=True)
+            return False
     
     def sync(self, cleanup: bool = True) -> Dict[str, int]:
         """
@@ -376,6 +399,9 @@ Examples:
     
     # Perform sync
     stats = uploader.sync(cleanup=not args.keep_temp)
+    
+    # Post statistics to endpoint
+    uploader.post_stats_to_endpoint(stats)
     
     # Exit with error code if any failures
     sys.exit(0 if stats['failed'] == 0 else 1)
